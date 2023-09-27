@@ -17,7 +17,7 @@ import org.springframework.web.client.RestTemplate;
 public class TransactionService {
 
   @Autowired
-  private UserServices userServices;
+  private UserService userService;
 
   @Autowired
   private TransactionRepository transactionRepository;
@@ -25,11 +25,14 @@ public class TransactionService {
   @Autowired
   private RestTemplate restTemplate;
 
-  public void createTransaction(TransactionDTO transactionDTO) throws Exception {
-    User sender = this.userServices.findUserById(transactionDTO.senderId());
-    User receiver = this.userServices.findUserById(transactionDTO.receiverId());
+  @Autowired
+  private NotificationService notificationService;
 
-    userServices.validateTransaction(sender, transactionDTO.value());
+  public Transaction createTransaction(TransactionDTO transactionDTO) throws Exception {
+    User sender = this.userService.findUserById(transactionDTO.senderId());
+    User receiver = this.userService.findUserById(transactionDTO.receiverId());
+
+    userService.validateTransaction(sender, transactionDTO.value());
 
     boolean isAuthorized = this.authorizedTransaction(sender, transactionDTO.value());
     if(!isAuthorized) {
@@ -45,20 +48,19 @@ public class TransactionService {
     sender.setBalance(sender.getBalance().subtract(transactionDTO.value()));
     receiver.setBalance(receiver.getBalance().add(transactionDTO.value()));
 
-    this.userServices.saveUser(sender);
-    this.userServices.saveUser(receiver);
+    this.userService.saveUser(sender);
+    this.userService.saveUser(receiver);
     this.transactionRepository.save(newTransaction);
+
+    this.notificationService.sendNotification(sender, "Transaction completed successfully");
+    this.notificationService.sendNotification(receiver, "You received a payment");
+
+    return newTransaction;
   }
 
   public boolean authorizedTransaction(User sender, BigDecimal value) {
-      ResponseEntity<Map> authorizationResponse = restTemplate
-          .getForEntity("https://run.mocky.io/v3/8fafdd68-a090-496f-8c9a-3442cf30dae6", Map.class);
-
-      if(authorizationResponse.getStatusCode() == HttpStatus.OK) {
-        String message = (String) authorizationResponse.getBody().get("message");
-        return "Autorizado".equalsIgnoreCase(message);
-      } else {
-        return false;
-      }
+    String url = "http://localhost:8080/authorize";
+    ResponseEntity<Map> response = restTemplate.postForEntity(url, sender, Map.class);
+    return response.getStatusCode() == HttpStatus.OK;
   }
 }
