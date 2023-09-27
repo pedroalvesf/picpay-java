@@ -45,8 +45,8 @@ public class TransactionService {
     sender.setBalance(sender.getBalance().subtract(transactionDTO.value()));
     receiver.setBalance(receiver.getBalance().add(transactionDTO.value()));
 
-    this.userServices.save(sender);
-    this.userServices.save(receiver);
+    this.userServices.saveUser(sender);
+    this.userServices.saveUser(receiver);
     this.transactionRepository.save(newTransaction);
   }
 
